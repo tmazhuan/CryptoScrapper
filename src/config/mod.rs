@@ -20,11 +20,20 @@ pub struct Config {
     pub price_regex: String,
     pub price_percentage_regex: String,
     pub replace: Vec<Replace>,
+    pub asset_momentum_config: AssetMomentumConfig,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AssetMomentumConfig {
+    pub watch_period_start_date: String,
+    pub ranks_to_track: i32,
+    pub db_name: String,
+    pub db_uri: String,
 }
 ///The Configuration instance containing configuratio details and file location
 pub struct ConfigObject {
     pub configuration: Config,
-    source: String,
+    pub source: String,
 }
 impl Default for ConfigObject {
     fn default() -> Self {

@@ -1,0 +1,22 @@
+symbols = ["symbol1", "symbol2"]
+regex_expressions = ["symbol1", "symbol2"]
+replace_expressions = ["symbol1", "symbol2"]
+about_regex = "this is about_regex"
+what_is_regex = "this is what_is_regex"
+title_regex = "this is title_regex"
+price_regex = "this is price_regex"
+price_percentage_regex = "this is price_percentage_regex"
+
+[[replace]]
+from = "this is from"
+to = "this is from"
+
+[[replace]]
+from = "this is from1"
+to = "this is from1"
+
+[asset_momentum_config]
+watch_period_start_date = "2020-01-01"
+ranks_to_track = 500
+db_name = "asset_momentum"
+db_uri = "mongodb://localhost:27017"

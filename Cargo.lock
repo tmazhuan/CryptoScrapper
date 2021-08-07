@@ -418,6 +418,7 @@ dependencies = [
 name = "crypto_scrapper"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "clipboard-win",
  "fantoccini",
  "mongodb",
