@@ -121,7 +121,7 @@ impl CoinMarketCapScrapper {
     pub fn new(config_file_location: String) -> Result<CoinMarketCapScrapper, io::Error> {
         let rt = tokio::runtime::Runtime::new().unwrap();
         Ok(CoinMarketCapScrapper {
-            cfg: ConfigObject::new(config_file_location)?,
+            cfg: ConfigObject::new(&config_file_location)?,
             html_parser: rt.block_on(async { HtmlParser::new(45).await }).unwrap(),
             runtime: rt,
         })
@@ -376,7 +376,8 @@ mod tests {
     }
     #[test]
     fn test_get_price_non_existing_symbol() {
-        let scrapper = CoinMarketCapScrapper::new(String::from("./config/config.toml")).unwrap();
+        let mut scrapper =
+            CoinMarketCapScrapper::new(String::from("./config/config.toml")).unwrap();
         let result = scrapper.get_price("aseff");
         match result {
             Ok(_) => assert!(false, "expected an error"),

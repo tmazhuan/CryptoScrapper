@@ -25,10 +25,13 @@ pub struct Config {
 
 #[derive(Serialize, Deserialize)]
 pub struct AssetMomentumConfig {
-    pub watch_period_start_date: String,
+    pub observation_period_start_date: String,
     pub ranks_to_track: i32,
     pub db_name: String,
     pub db_uri: String,
+    pub symbol_collection: String,
+    pub metrics_collection: String,
+    pub ignore_symbols_name: String,
 }
 ///The Configuration instance containing configuratio details and file location
 pub struct ConfigObject {
@@ -59,12 +62,12 @@ impl ConfigObject {
     /// * `config_file`- the location of the config file to be used
     /// # Errors
     /// If there is an IO error and error is returned
-    pub fn new(config_file: String) -> Result<ConfigObject, io::Error> {
-        let config_text = std::fs::read_to_string(&config_file)?;
+    pub fn new(config_file: &String) -> Result<ConfigObject, io::Error> {
+        let config_text = std::fs::read_to_string(config_file)?;
         let config_const_values: Config = toml::from_str(&config_text).unwrap();
         Ok(ConfigObject {
             configuration: config_const_values,
-            source: config_file,
+            source: String::from(config_file),
         })
     }
     ///Deletes the symbol at index `i` from the `ConfigObject`
@@ -101,7 +104,7 @@ mod tests {
     use super::ConfigObject;
     #[test]
     fn test_new() {
-        let config_file = ConfigObject::new(String::from("./config/test.toml"));
+        let config_file = ConfigObject::new(&String::from("./config/test.toml")).unwrap();
         assert_eq!(
             config_file.configuration.about_regex,
             String::from("about_regex")

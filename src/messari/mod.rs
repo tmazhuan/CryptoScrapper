@@ -104,7 +104,7 @@ pub fn get_symbols(ranks_to_track: i32) -> Vec<Asset> {
         for i in temp.data {
             result.push(Asset {
                 slug: i.get(&String::from("slug")).unwrap().to_string(),
-                last_update: 0,
+                last_update_sec: 0,
                 // mcaptype: None,
             });
         }
@@ -117,13 +117,13 @@ pub fn get_symbols(ranks_to_track: i32) -> Vec<Asset> {
 }
 
 pub fn get_1_item_metric_history(
-    slug: String,
-    metric: String,
+    slug: &String,
+    metric: &String,
     alternate_metric: Option<String>,
-    from: String,
-    to: String,
-    parameters: Option<String>,
-) -> (Option<AssetMetrics>, String) {
+    from: &String,
+    to: &String,
+    parameters: &Option<String>,
+) -> Option<AssetMetrics> {
     let mut headers = header::HeaderMap::new();
     let api_key = env::var("API_KEY").unwrap();
     let mut metric_id = String::new();
@@ -206,12 +206,12 @@ pub fn get_1_item_metric_history(
             let (data, last_update) =
                 MetricsTimeSeriesElement::vec_from(r.data.values, String::from(&metric_id));
             Some(AssetMetrics {
-                slug: slug,
+                slug: String::from(slug),
                 data: data,
-                last_update: last_update,
+                last_update_sec: last_update,
             })
         }
         None => None,
     };
-    return (result, metric_id);
+    return result;
 }

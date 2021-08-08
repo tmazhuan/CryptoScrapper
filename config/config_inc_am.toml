@@ -16,7 +16,7 @@ from = "this is from1"
 to = "this is from1"
 
 [asset_momentum_config]
-watch_period_start_date = "2020-01-01"
+observation_period_start_date = "2020-01-01"
 ranks_to_track = 500
 db_name = "asset_momentum"
 db_uri = "mongodb://localhost:27017"
