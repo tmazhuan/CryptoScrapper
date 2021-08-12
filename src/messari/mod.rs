@@ -105,6 +105,7 @@ pub fn get_symbols(ranks_to_track: i32) -> Vec<Asset> {
             result.push(Asset {
                 slug: i.get(&String::from("slug")).unwrap().to_string(),
                 last_update_sec: 0,
+                first_entry_sec: i64::MAX,
                 // mcaptype: None,
             });
         }
@@ -203,11 +204,12 @@ pub fn get_1_item_metric_history(
     };
     let result = match v {
         Some(r) => {
-            let (data, last_update) =
+            let (data, min_time_stamp, last_update) =
                 MetricsTimeSeriesElement::vec_from(r.data.values, String::from(&metric_id));
             Some(AssetMetrics {
                 slug: String::from(slug),
                 data: data,
+                first_item_sec: min_time_stamp,
                 last_update_sec: last_update,
             })
         }

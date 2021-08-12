@@ -369,7 +369,8 @@ mod tests {
     use super::CoinMarketCapScrapper;
     #[test]
     fn test_get_price_existing_symbol() {
-        let scrapper = CoinMarketCapScrapper::new(String::from("./config/config.toml")).unwrap();
+        let mut scrapper =
+            CoinMarketCapScrapper::new(String::from("./config/config.toml")).unwrap();
         let result = scrapper.get_price("multi-collateral-dai").unwrap();
         assert_eq!(result.price, 1.0); //testing with stable coin. expected value is 1.0
         assert!(result.change < 0.2 && result.change > -0.2); //testing with a stable coin. Difference should be less than 0.2%

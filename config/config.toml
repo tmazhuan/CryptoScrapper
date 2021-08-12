@@ -37,7 +37,7 @@ to = "\\n"
 
 [asset_momentum_config]
 observation_period_start_date = "2020-01-01"
-ranks_to_track = 15
+ranks_to_track = 5
 db_name = "asset_momentum"
 db_uri = "mongodb://localhost:27017"
 symbol_collection = "symbols"

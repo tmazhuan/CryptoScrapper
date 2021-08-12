@@ -37,6 +37,49 @@ fn main() {
             am.init_asset_momentum(String::from("2021-07-27"));
         } else if args[1].eq("amupdate") {
             am.update_asset_momentum(&String::from("2021-08-02"));
+        } else if args[1].eq("amrun1") {
+            match am.get_daily_performance_of_asset(
+                String::from("bitcoin"),
+                &String::from("2021-01-01"),
+                &String::from("2021-07-27"),
+            ) {
+                Some(result) => {
+                    println!("{}", assetmomentum::AssetPerformanceResult::table_header());
+                    for i in result {
+                        println!("{}", i);
+                    }
+                }
+                None => println!("there was a error getting the data"),
+            }
+        } else if args[1].eq("amrun2") {
+            match am.get_performance_of_asset(
+                String::from("bitcoin"),
+                String::from("2021-01-01"),
+                String::from("2021-07-27"),
+            ) {
+                Some(result) => {
+                    println!("{}", assetmomentum::AssetPerformanceResult::table_header());
+                    println!("{}", result);
+                }
+                None => println!("there was a error getting the data"),
+            };
+        } else if args[1].eq("amrun3") {
+            let r = am.get_daily_performance_all_assets(
+                String::from("2021-07-01"),
+                String::from("2021-07-27"),
+            );
+            for (_, result) in r {
+                match result {
+                    Some(result) => {
+                        println!("{}", assetmomentum::AssetPerformanceResult::table_header());
+                        for i in result {
+                            println!("{}", i);
+                        }
+                        println!("---------------------------------------------------");
+                    }
+                    None => println!("there was a error getting the data"),
+                };
+            }
         }
     } else {
         println!("please use either no parameters or \"am\" to start assetmomentum function");
