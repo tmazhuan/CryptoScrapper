@@ -119,6 +119,7 @@ pub fn get_inner_html_from_element(
     regex: &str,
     source: &str,
     relations: Vec<Vec<ElementRelation>>,
+    symbol: &str,
 ) -> Result<Vec<String>, ParseError> {
     let re = Regex::new(regex).unwrap();
     let cap = re.captures(source);
@@ -127,9 +128,10 @@ pub fn get_inner_html_from_element(
         None => {
             // println!("Regex: {}", regex);
             // println!("html: {}", source);
-            return Err(ParseError::new(String::from(
-                "Element not found. Please check manually",
-            )));
+            return Err(ParseError::new(String::from(format!(
+                "Element {} for {} not found! Please check manually!!!",
+                regex, symbol
+            ))));
         }
     };
     let selector = Selector::parse(&format!("{}[{}]", tag, attribute)).unwrap();

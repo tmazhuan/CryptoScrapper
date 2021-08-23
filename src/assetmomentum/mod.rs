@@ -27,6 +27,7 @@ pub struct AssetMetrics {
     pub first_item_sec: i64,
     pub data: Vec<MetricsTimeSeriesElement>,
 }
+#[derive(Serialize, Deserialize)]
 pub struct AssetPerformanceResult {
     pub slug: String,
     pub start_value: MetricsTimeSeriesElement,
@@ -48,9 +49,9 @@ impl Display for AssetPerformanceResult {
             self.slug,
             NaiveDateTime::from_timestamp(self.start_value.timestamp_sec, 0).format("%F"),
             NaiveDateTime::from_timestamp(self.end_value.timestamp_sec, 0).format("%F"),
-            format!("{:.1$}", self.start_value.value, 2),
-            format!("{:.1$}", self.end_value.value, 2),
-            format!("{:.1$}", self.abs_change, 2),
+            format!("{:.1$}", self.start_value.value, 4),
+            format!("{:.1$}", self.end_value.value, 4),
+            format!("{:.1$}", self.abs_change, 4),
             format!("{:.1$}", self.percentage_change * 100.0, 2),
         )
     }
@@ -66,11 +67,33 @@ impl AssetPerformanceResult {
         slug: &String,
         start: &MetricsTimeSeriesElement,
         end: &MetricsTimeSeriesElement,
+        max: f64,
+        min: f64,
     ) -> AssetPerformanceResult {
+        let sign = &end.value >= &start.value;
+        let debug_print = *slug == String::from("none");
+        if debug_print {
+            println!(
+                "ts_start: {}, ts_end: {}, start_value: {}, end_value: {}, change: {}",
+                &start.timestamp_sec,
+                &end.timestamp_sec,
+                &start.value,
+                &end.value,
+                if sign {
+                    ((&end.value - &start.value) / &start.value).min(max)
+                } else {
+                    ((&end.value - &start.value) / &start.value).max(min)
+                }
+            );
+        }
         return AssetPerformanceResult {
             slug: String::from(slug),
             abs_change: &end.value - &start.value,
-            percentage_change: (&end.value - &start.value) / &start.value,
+            percentage_change: if sign {
+                ((&end.value - &start.value) / &start.value).min(max)
+            } else {
+                ((&end.value - &start.value) / &start.value).max(min)
+            },
             start_value: MetricsTimeSeriesElement {
                 timestamp_sec: start.timestamp_sec,
                 value: start.value,
@@ -107,20 +130,144 @@ impl AssetMomentum {
             ),
         })
     }
+    pub fn calculate_accum_performance_divergence(&self, from: &String, to: &String) {
+        //get the daily performance of each symbol
+        let daily_performance: HashMap<String, Option<Vec<AssetPerformanceResult>>> =
+            self.get_daily_performance_all_assets(from, to);
+        //get the average performance
+        let avg_performance: HashMap<i64, MetricsTimeSeriesElement> =
+            self.calculate_overall_average_performance(from, to, false);
+        //for each symbol in daily performance
+        // println!(
+        //     "Going to calculate performance divergence for {} assets.",
+        //     daily_performance.len()
+        // );
+        for (symbol, perf) in daily_performance {
+            let debug_print = symbol == String::from("none");
+            //first lets delete the corresponding metric entries
+            self.db
+                .delete_metric(&symbol, String::from("accum_divergence"));
+            match perf {
+                Some(mut dperformance) => {
+                    //assume or sort the daily performance.
+                    dperformance
+                        .sort_by(|a, b| a.end_value.timestamp_sec.cmp(&b.end_value.timestamp_sec));
+                    let mut accum_perform_div = 0.0;
+                    let mut result: Vec<MetricsTimeSeriesElement> = Vec::new();
+                    //iterate through sorted daily performance and add the change to the sum of the previous changes and store the value
+                    for dp in dperformance {
+                        if debug_print {
+                            println!("Current accum_perform_div value: {}", accum_perform_div);
+                        }
+                        let avper_temp = avg_performance
+                            .get(&dp.end_value.timestamp_sec)
+                            .unwrap()
+                            .value;
+                        accum_perform_div = accum_perform_div + (dp.percentage_change - avper_temp);
+                        if debug_print {
+                            println!("ts: {}.....daily_performance: {}.....avg_performance: {}......divergance: {}",&dp.end_value.timestamp_sec,dp.percentage_change,avper_temp,accum_perform_div);
+                        } //in a MetricsTimeSeriesElement
+                        result.push(MetricsTimeSeriesElement {
+                            timestamp_sec: dp.end_value.timestamp_sec,
+                            value: accum_perform_div,
+                            metrics_id: String::from("accum_divergence"),
+                        })
+                    }
+                    //store the MetricsTimeSeriesElements
+                    self.db.store_metric_elements(&symbol, result)
+                }
+                None => (),
+            }
+        }
+    }
+    pub fn calculate_overall_average_performance(
+        &self,
+        from: &String,
+        to: &String,
+        store: bool,
+    ) -> HashMap<i64, MetricsTimeSeriesElement> {
+        // println!("Calculating average performance of assets");
+        //to calculate the average we are creating a hashmap with date/(sum of performance,count of asset) of value pairs
+        let mut cache: HashMap<i64, f64> = HashMap::new();
+        let mut count: HashMap<i64, i32> = HashMap::new();
+        //we only get the daily performance of all assets if we didnt get i passed
+        let performances = self.get_daily_performance_all_assets(from, to);
+        //for each daily performance returned
+        for (_slug, p) in performances {
+            match p {
+                Some(performance) => {
+                    for dp in performance {
+                        //lets make some check on data
+                        let change = dp.percentage_change;
+                        let ts = dp.end_value.timestamp_sec;
+                        // if change > 0.5 {
+                        //     println!(
+                        //         "{}: On {} we have a daily change of {} from {} to {}",
+                        //         slug, ts, change, dp.start_value.value, dp.end_value.value
+                        //     );
+                        // }
+                        if cache.contains_key(&ts) {
+                            *cache.get_mut(&ts).unwrap() += change;
+                        } else {
+                            cache.insert(ts, change);
+                        }
+                        // *cache.entry(ts).or_insert(change) += change;
+                        if count.contains_key(&ts) {
+                            *count.get_mut(&ts).unwrap() += 1;
+                        } else {
+                            count.insert(ts, 1);
+                        }
+                        // *count.entry(ts).or_insert(0) += 1;
+                        //println!("{}: Adding {} to cache resulting in {}. Current number of entries for ts {}: {}",slug,change,cache.get(&ts).unwrap(),ts,count.get(&ts).unwrap());
+                    }
+                }
+                None => (),
+            }
+        }
+        //now we create the result vector of (timestamp,avg) to then create MetricsTimeSeriesElement
+        let mut avg_change_vec: Vec<(i64, f64)> = Vec::new();
+        for (key, value) in cache {
+            avg_change_vec.push((key, value / (*count.get(&key).unwrap() as f64)));
+        }
+        let (avg_change_metrics, min_time_stamp, last_update) =
+            MetricsTimeSeriesElement::hashmap_from(
+                avg_change_vec,
+                String::from("average_change"),
+                false,
+            );
+        if store {
+            let mut data = Vec::new();
+            for (_, value) in &avg_change_metrics {
+                data.push(MetricsTimeSeriesElement {
+                    timestamp_sec: value.timestamp_sec,
+                    value: value.value,
+                    metrics_id: String::from("overall_avg"),
+                });
+            }
+            let metric = AssetMetrics {
+                slug: String::from("overall_avg"),
+                data: data,
+                first_item_sec: min_time_stamp,
+                last_update_sec: last_update,
+            };
+            self.db
+                .drop_collection(&String::from("overall_avg_metrics"));
+            self.db.store_asset_metric(metric);
+        }
+        return avg_change_metrics;
+    }
     pub fn get_performance_of_asset(
         &self,
         slug: String,
         from: String,
         to: String,
     ) -> Option<AssetPerformanceResult> {
-        let mut from = NaiveDate::parse_from_str(&from, "%Y-%m-%d")
-            .unwrap()
-            .and_hms_milli(0, 0, 0, 0)
-            .timestamp();
-        let mut to = NaiveDate::parse_from_str(&to, "%Y-%m-%d")
-            .unwrap()
-            .and_hms_milli(0, 0, 0, 0)
-            .timestamp();
+        println!(
+            "Getting performance of asset: {}, from {} to {}",
+            slug, from, to
+        );
+        let mut from = date_string_to_unix_ts(&from);
+        let mut to = date_string_to_unix_ts(&to);
         let asset = self.db.get_slug_summary(&slug);
         if asset.is_none() {
             println!("Asset {} not found.", slug);
@@ -135,8 +282,10 @@ impl AssetMomentum {
         }
         let start = self
             .db
-            .get_metric(&asset, &String::from("price"), from, None);
-        let end = self.db.get_metric(&asset, &String::from("price"), to, None);
+            .get_metric(&asset, &String::from("price"), from, None, false);
+        let end = self
+            .db
+            .get_metric(&asset, &String::from("price"), to, None, false);
         if start.is_none() || end.is_none() {
             return None;
         };
@@ -145,6 +294,14 @@ impl AssetMomentum {
             &asset.slug,
             &start.unwrap().data[0],
             &end.unwrap().data[0],
+            self.config
+                .configuration
+                .asset_momentum_config
+                .max_performance_day,
+            self.config
+                .configuration
+                .asset_momentum_config
+                .min_performance_day,
         ));
     }
     pub fn get_daily_performance_of_asset(
@@ -153,14 +310,10 @@ impl AssetMomentum {
         from: &String,
         to: &String,
     ) -> Option<Vec<AssetPerformanceResult>> {
-        let mut from = NaiveDate::parse_from_str(&from, "%Y-%m-%d")
-            .unwrap()
-            .and_hms_milli(0, 0, 0, 0)
-            .timestamp();
-        let mut to = NaiveDate::parse_from_str(&to, "%Y-%m-%d")
-            .unwrap()
-            .and_hms_milli(0, 0, 0, 0)
-            .timestamp();
+        // println!("Calculating daily performance of {}", slug);
+        let debug_print = *slug == String::from("none");
+        let mut from = date_string_to_unix_ts(from);
+        let mut to = date_string_to_unix_ts(to);
         let asset = self.db.get_slug_summary(&slug);
         if asset.is_none() {
             println!("Asset {} not found.", slug);
@@ -176,7 +329,7 @@ impl AssetMomentum {
 
         let metrics = self
             .db
-            .get_metric(&asset, &String::from("price"), from, Some(to));
+            .get_metric(&asset, &String::from("price"), from, Some(to), true);
         if metrics.is_none() {
             println!("there was a mistake while getting metrics");
             return None;
@@ -184,18 +337,30 @@ impl AssetMomentum {
         let metrics = metrics.unwrap();
         let mut performance: Vec<AssetPerformanceResult> = Vec::new();
         for i in 0..metrics.data.len() - 1 {
-            performance.push(AssetPerformanceResult::from(
+            let p = AssetPerformanceResult::from(
                 &asset.slug,
                 &metrics.data[i],
                 &metrics.data[i + 1],
-            ));
+                self.config
+                    .configuration
+                    .asset_momentum_config
+                    .max_performance_day,
+                self.config
+                    .configuration
+                    .asset_momentum_config
+                    .min_performance_day,
+            );
+            if debug_print {
+                println!("{}", &p);
+            };
+            performance.push(p);
         }
         return Some(performance);
     }
     pub fn get_daily_performance_all_assets(
         &self,
-        from: String,
-        to: String,
+        from: &String,
+        to: &String,
     ) -> HashMap<String, Option<Vec<AssetPerformanceResult>>> {
         let assets = self.db.get_slug_summaries();
         let mut result: HashMap<String, Option<Vec<AssetPerformanceResult>>> = HashMap::new();
@@ -288,10 +453,11 @@ impl AssetMomentum {
         _alternate_metric: Option<String>,
         parameters: Option<String>,
     ) {
-        let to_date_in_seconds = NaiveDate::parse_from_str(to_date, "%Y-%m-%d")
-            .unwrap()
-            .and_hms_milli(0, 0, 0, 0)
-            .timestamp();
+        let to_date_in_seconds = date_string_to_unix_ts(to_date);
+        // let to_date_in_seconds = NaiveDate::parse_from_str(to_date, "%Y-%m-%d")
+        //     .unwrap()
+        //     .and_hms_milli(0, 0, 0, 0)
+        //     .timestamp();
         for asset in messari_assets_filterd {
             let from = if asset.last_update_sec <= 0 {
                 String::from(
@@ -332,21 +498,55 @@ impl AssetMomentum {
             let slug = String::from(&metric.slug);
             let lastupdate = metric.last_update_sec;
             let first_entry = metric.first_item_sec;
-            self.db.store_metric(metric);
+            self.db.store_asset_metric(metric);
             self.db.update_slug_summary(slug, first_entry, lastupdate);
         }
     }
 }
 impl MetricsTimeSeriesElement {
+    pub fn hashmap_from(
+        data: Vec<(i64, f64)>,
+        metrics_id: String,
+        milliseconds: bool,
+    ) -> (HashMap<i64, MetricsTimeSeriesElement>, i64, i64) {
+        let mut result: HashMap<i64, MetricsTimeSeriesElement> = HashMap::with_capacity(data.len());
+        let mut maxtimestamp = 0;
+        let mut mintimestamp = i64::MAX;
+        for (t, v) in data {
+            let mut t_sec = t;
+            if milliseconds {
+                t_sec = t_sec / 1000;
+            };
+            result.insert(
+                t_sec,
+                MetricsTimeSeriesElement {
+                    timestamp_sec: t_sec,
+                    value: v,
+                    metrics_id: String::from(&metrics_id),
+                },
+            );
+            if t_sec > maxtimestamp {
+                maxtimestamp = t_sec;
+            }
+            if t_sec < mintimestamp {
+                mintimestamp = t_sec
+            }
+        }
+        return (result, mintimestamp, maxtimestamp);
+    }
     pub fn vec_from(
         data: Vec<(i64, f64)>,
         metrics_id: String,
+        milliseconds: bool,
     ) -> (Vec<MetricsTimeSeriesElement>, i64, i64) {
         let mut result: Vec<MetricsTimeSeriesElement> = Vec::with_capacity(data.len());
         let mut maxtimestamp = 0;
         let mut mintimestamp = i64::MAX;
         for (t, v) in data {
-            let t_sec = t / 1000;
+            let mut t_sec = t;
+            if milliseconds {
+                t_sec = t_sec / 1000;
+            };
             result.push(MetricsTimeSeriesElement {
                 timestamp_sec: t_sec,
                 value: v,
@@ -361,4 +561,11 @@ impl MetricsTimeSeriesElement {
         }
         return (result, mintimestamp, maxtimestamp);
     }
+}
+
+pub fn date_string_to_unix_ts(input: &String) -> i64 {
+    NaiveDate::parse_from_str(&input, "%Y-%m-%d")
+        .unwrap()
+        .and_hms_milli(0, 0, 0, 0)
+        .timestamp()
 }

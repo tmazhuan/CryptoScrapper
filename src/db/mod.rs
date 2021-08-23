@@ -1,4 +1,4 @@
-use super::assetmomentum::{Asset, AssetMetrics};
+use super::assetmomentum::{Asset, AssetMetrics, MetricsTimeSeriesElement};
 use core::time::Duration;
 use mongodb::bson::{self, doc};
 use mongodb::options::{DropCollectionOptions, FindOneOptions, FindOptions, WriteConcern};
@@ -52,7 +52,7 @@ impl AssetMommentumMongo {
             self.drop_collection(&format!("{}_{}", key, self.metrics_collection));
         }
     }
-    fn drop_collection(&self, collection_name: &String) {
+    pub fn drop_collection(&self, collection_name: &String) {
         // self.init();
         //drop database if existing
         //drop symbols
@@ -132,6 +132,16 @@ impl AssetMommentumMongo {
         let collection = self.database.collection(&self.ignore_symbols_name);
         collection
             .insert_one(bson::to_document(&doc).unwrap(), None)
+            .unwrap();
+    }
+    pub fn delete_metric(&self, slug: &String, metric: String) {
+        let mut doc = bson::Document::new();
+        doc.insert(String::from("metrics_id"), metric);
+        let collection = self
+            .database
+            .collection(&format!("{}_{}", slug, self.metrics_collection));
+        collection
+            .delete_many(bson::to_document(&doc).unwrap(), None)
             .unwrap();
     }
 
@@ -226,18 +236,28 @@ impl AssetMommentumMongo {
             .unwrap();
     }
 
-    // pub fn get_metric()
-    pub fn store_metric(&self, metrics: AssetMetrics) {
-        // let client = Client::with_uri_str(DB_URI).unwrap();
-        // let database = client.database(DB_NAME);
+    pub fn store_metric_elements(&self, slug: &String, metrics: Vec<MetricsTimeSeriesElement>) {
+        // println!("Storing metric elements: {}", metrics.len());
         let collection = self
             .database
-            .collection(&format!("{}_{}", metrics.slug, self.metrics_collection));
+            .collection(&format!("{}_{}", slug, self.metrics_collection));
         let mut documents = Vec::new();
-        for item in metrics.data {
+        for item in metrics {
             documents.push(bson::to_document(&item).unwrap());
         }
         collection.insert_many(documents, None).unwrap();
+    }
+
+    pub fn store_asset_metric(&self, metrics: AssetMetrics) {
+        self.store_metric_elements(&metrics.slug, metrics.data);
+        // let collection = self
+        //     .database
+        //     .collection(&format!("{}_{}", metrics.slug, self.metrics_collection));
+        // let mut documents = Vec::new();
+        // for item in metrics.data {
+        //     documents.push(bson::to_document(&item).unwrap());
+        // }
+        // collection.insert_many(documents, None).unwrap();
     }
     pub fn get_metric(
         &self,
@@ -245,6 +265,7 @@ impl AssetMommentumMongo {
         metric_id: &String,
         from: i64,
         to: Option<i64>,
+        sorted: bool,
     ) -> Option<AssetMetrics> {
         let single_value = if to.is_none() { true } else { false };
         let collection = self
@@ -289,6 +310,11 @@ impl AssetMommentumMongo {
                     result
                         .data
                         .push(bson::from_document(item.unwrap()).unwrap());
+                }
+                if sorted {
+                    result
+                        .data
+                        .sort_by(|a, b| a.timestamp_sec.cmp(&b.timestamp_sec));
                 }
                 Some(result)
             }

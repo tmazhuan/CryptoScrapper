@@ -4,6 +4,7 @@ pub mod db;
 pub mod frontend;
 pub mod messari;
 
+use chrono::Utc;
 use crypto_scrapper::CoinMarketCapScrapper;
 use frontend::*;
 use std::env;
@@ -34,14 +35,16 @@ fn main() {
             }
         };
         if args[1].eq("aminit") {
-            am.init_asset_momentum(String::from("2021-07-27"));
+            // am.init_asset_momentum(Some(String::from("2021-07-27")));
+            am.init_asset_momentum(format!("{}", Utc::now().format("%Y-%m-%d")));
         } else if args[1].eq("amupdate") {
-            am.update_asset_momentum(&String::from("2021-08-02"));
+            // am.update_asset_momentum(Some(String::from("2021-08-02")));
+            am.update_asset_momentum(&format!("{}", Utc::now().format("%Y-%m-%d")));
         } else if args[1].eq("amrun1") {
             match am.get_daily_performance_of_asset(
                 String::from("bitcoin"),
                 &String::from("2021-01-01"),
-                &String::from("2021-07-27"),
+                &format!("{}", Utc::now().format("%Y-%m-%d")),
             ) {
                 Some(result) => {
                     println!("{}", assetmomentum::AssetPerformanceResult::table_header());
@@ -55,7 +58,7 @@ fn main() {
             match am.get_performance_of_asset(
                 String::from("bitcoin"),
                 String::from("2021-01-01"),
-                String::from("2021-07-27"),
+                format!("{}", Utc::now().format("%Y-%m-%d")),
             ) {
                 Some(result) => {
                     println!("{}", assetmomentum::AssetPerformanceResult::table_header());
@@ -63,10 +66,10 @@ fn main() {
                 }
                 None => println!("there was a error getting the data"),
             };
-        } else if args[1].eq("amrun3") {
+        } else if args[1].eq("amdaily") {
             let r = am.get_daily_performance_all_assets(
-                String::from("2021-07-01"),
-                String::from("2021-07-27"),
+                &String::from("2020-01-01"),
+                &format!("{}", Utc::now().format("%Y-%m-%d")),
             );
             for (_, result) in r {
                 match result {
@@ -80,6 +83,20 @@ fn main() {
                     None => println!("there was a error getting the data"),
                 };
             }
+        } else if args[1].eq("amdiv") {
+            am.calculate_accum_performance_divergence(
+                &String::from("2020-01-01"),
+                &format!("{}", Utc::now().format("%Y-%m-%d")),
+            );
+        } else if args[1].eq("amavg") {
+            am.calculate_overall_average_performance(
+                &String::from("2020-01-01"),
+                &format!("{}", Utc::now().format("%Y-%m-%d")),
+                true,
+            );
+        } else if args[1].eq("amtest") {
+            // *map.entry("poneyland").or_insert(10) *= 2;
+            // assert_eq!(map["poneyland"], 6);
         }
     } else {
         println!("please use either no parameters or \"am\" to start assetmomentum function");

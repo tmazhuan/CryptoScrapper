@@ -27,6 +27,8 @@ pub struct Config {
 pub struct AssetMomentumConfig {
     pub observation_period_start_date: String,
     pub ranks_to_track: i32,
+    pub max_performance_day: f64,
+    pub min_performance_day: f64,
     pub db_name: String,
     pub db_uri: String,
     pub symbol_collection: String,

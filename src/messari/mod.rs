@@ -205,7 +205,7 @@ pub fn get_1_item_metric_history(
     let result = match v {
         Some(r) => {
             let (data, min_time_stamp, last_update) =
-                MetricsTimeSeriesElement::vec_from(r.data.values, String::from(&metric_id));
+                MetricsTimeSeriesElement::vec_from(r.data.values, String::from(&metric_id), true);
             Some(AssetMetrics {
                 slug: String::from(slug),
                 data: data,

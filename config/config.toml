@@ -4,7 +4,7 @@ replace_expressions = ["<strong>", "</strong>", "<!-- -->", "<div>", "</div>", "
 about_regex = "<(div) (class=\"about___.{1,20}\")>"
 what_is_regex = "<(h\\d)\\s{1}(.{1,20}=\"what-is-.*?\")>.*?</h\\d>"
 title_regex = "<h\\d{1}.*?>(.*?)</h\\d{1}>"
-price_regex = "(div) (class=\".{1,20}priceTitle__.{1,20}\")>"
+price_regex = "(div) (class=\".{1,20}priceTitle{1,20}\")>"
 price_percentage_regex = "<span class=\"(.{1,20})\"></span>([0-9]+[.]?[0-9]*)<!-- -->%"
 
 [[replace]]
@@ -36,8 +36,10 @@ from = "<hr>"
 to = "\\n"
 
 [asset_momentum_config]
-observation_period_start_date = "2020-01-01"
+observation_period_start_date = "2021-08-15"
 ranks_to_track = 5
+max_performance_day = 1.0
+min_performance_day = -0.5
 db_name = "asset_momentum"
 db_uri = "mongodb://localhost:27017"
 symbol_collection = "symbols"

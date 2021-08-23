@@ -145,6 +145,7 @@ impl CoinMarketCapScrapper {
             &self.cfg.configuration.what_is_regex,
             &html,
             vec![vec![ElementRelation::Parent]],
+            symbol,
         ) {
             Ok(s) => String::from(&s[0]),
             Err(_) => {
@@ -152,6 +153,7 @@ impl CoinMarketCapScrapper {
                     &self.cfg.configuration.about_regex,
                     &html,
                     vec![vec![ElementRelation::Parent]],
+                    symbol,
                 ) {
                     Ok(s) => String::from(&s[0]),
                     Err(e) => return Err(e),
@@ -255,14 +257,17 @@ impl CoinMarketCapScrapper {
         reg_price_section: Arc<String>,
         per_regex: Arc<String>,
     ) -> Result<PriceResult, ParseError> {
+        // println!("Parsing price for: {}", &symbol);
         let price = match html::get_inner_html_from_element(
             &reg_price_section,
             &html,
             vec![vec![ElementRelation::Child(0)]],
+            &symbol,
         ) {
             Ok(s) => String::from(&s[0]),
             Err(e) => return Err(e),
         };
+        // println!("Price received for: {}", &symbol);
         let price = price
             .replace("$", "")
             .replace(",", "")
@@ -273,6 +278,7 @@ impl CoinMarketCapScrapper {
             &reg_price_section,
             &html,
             vec![vec![ElementRelation::Child(0), ElementRelation::Sibling(0)]],
+            &symbol,
         ) {
             Ok(s) => String::from(&s[0]),
             Err(e) => return Err(e),
@@ -344,11 +350,12 @@ impl CoinMarketCapScrapper {
             let rel_price = vec![vec![Child(1), Child(i), Child(3)]];
             let rel_vol = vec![vec![Child(1), Child(i), Child(4), Child(0)]];
             let rel_vol_perc = vec![vec![Child(1), Child(i), Child(5), Child(0), Child(0)]];
-            let inner_source = html::get_inner_html_from_element(regex, &html, rel_source)?;
-            let inner_pairs = html::get_inner_html_from_element(regex, &html, rel_pairs)?;
-            let inner_price = html::get_inner_html_from_element(regex, &html, rel_price)?;
-            let inner_vol = html::get_inner_html_from_element(regex, &html, rel_vol)?;
-            let inner_vol_perc = html::get_inner_html_from_element(regex, &html, rel_vol_perc)?;
+            let inner_source = html::get_inner_html_from_element(regex, &html, rel_source, symbol)?;
+            let inner_pairs = html::get_inner_html_from_element(regex, &html, rel_pairs, symbol)?;
+            let inner_price = html::get_inner_html_from_element(regex, &html, rel_price, symbol)?;
+            let inner_vol = html::get_inner_html_from_element(regex, &html, rel_vol, symbol)?;
+            let inner_vol_perc =
+                html::get_inner_html_from_element(regex, &html, rel_vol_perc, symbol)?;
             result.push(MarketResult {
                 source: String::from(&inner_source[0]),
                 pair: String::from(&inner_pairs[0]),
